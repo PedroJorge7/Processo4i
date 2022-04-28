@@ -295,7 +295,7 @@ faas4i::login()
 # Open data
 dataset_2 <- readxl::read_excel("./inputs/producao_auto-step2.xlsx") %>% 
   rename(producao_automoveis = producaodeautomoveisnacionaloriginalmensalnivel) %>% 
-  select(-c(3:11,17:19,22)) %>% 
+  select(-c(3:8,13:15,18)) %>% 
   filter(as.numeric(substr(data_tidy,1,4))>=2000)
 
 dataset_3 <- dataset_2 %>% 
@@ -487,7 +487,7 @@ faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
 
 ## Unzip projcets -----------
 
-download_zip(project_id = list_projects()[[1]]$id,
+download_zip(project_id = list_projects()[[5]]$id,
              path = "D:/Pedro Jorge/4i",
              filename = "processo_seletivo_4i")
 unzip("forecast-processo_seletivo_4i.zip")
@@ -498,14 +498,9 @@ results <- readRDS("forecast_1_producao_automoveis_626727210db5bff231ffe00e_2022
 results$infos
 
 # Acurácia (MAPE)
-results[[13]][[1]]
 
 ## graph
-results[[19]][[1]]
-
 forecast <- results[[21]][[8]]
-a <- forecast %>% mutate(mape = abs((y_orig-y_fit)/y_orig))
-mean(a$mape, na.rm = T)*100
 
 forecast <- forecast %>% 
   select(c(data_tidy,y_orig,y_fit)) %>% 
