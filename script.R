@@ -5,7 +5,10 @@
 # Installing/Loading All Libraries
 packages <- c("ggplot2"      ,"tidyverse"        ,"data.table",
               "rnaturalearth","rnaturalearthdata","viridis",
-              "ggspatial"    ,"kableExtra")  
+              "ggspatial"    ,"kableExtra"       ,"strucchange",
+              "nonlinearTseries")  
+
+
 
 # Install if necessary and already load the packages
 to_install <- packages[! packages %in% installed.packages()[, "Package"]]
@@ -217,7 +220,7 @@ tab_russia <- tab_br %>% filter(!is.na(Rússia)) %>%
   mutate(descricao_ncm = ifelse(codigo_ncm == "12019000","Soja",
                          ifelse(codigo_ncm == "02071400","Galos/galinhas\n congelados",
                          ifelse(codigo_ncm == "09011110","Café em grão",
-                         ifelse(codigo_ncm == "12024200","Amendoin",
+                         ifelse(codigo_ncm == "12024200","Amendoim",
                          ifelse(codigo_ncm == "17011400","Outros Açúcares\n de cana",
                          ifelse(codigo_ncm == "31042090","Outros cloretos\n de potássio",
                          ifelse(codigo_ncm == "31054000","Diidrogeno-ortofosfato\n de amônio",
@@ -239,7 +242,7 @@ ggplot(subset(tab_russia),
   ) + 
   coord_flip() +
   facet_wrap(.~detalhamento, scales = "free") +
-  labs(x = "Descrição",y = "Percentual (em bilhões)")
+  labs(x = "Descrição",y = "Valor (em bilhões)")
 
 ggsave("./outputs/importados da Rússia.png", dpi = 1000,
        height = 12.5, width = 20, units = "cm")
@@ -289,38 +292,52 @@ install.packages("remotes")
 remotes::install_github("4intelligence/faas4i-pub", force = TRUE)
 library("faas4i")
 
+
+# Open data
+dataset <- readxl::read_excel("./inputs/producao_automoveis.xlsx") %>% 
+  rename(producao_automoveis = producaodeautomoveisnacionaloriginalmensalnivel)
+
+## Construindo base temporal
+dataset_temp <- dataset %>% 
+  filter(data.table::between(as.numeric(substr(data_tidy,1,4)),2000,2022)) %>% 
+  filter(!is.na(producao_automoveis))
+
+ggplot() + geom_line(data = dataset_temp, aes(x = data_tidy,
+                                              y = producao_automoveis/1000))  + 
+  theme_classic() +
+  labs(x = "Ano/mês", y = "Produção de automóveis (Mil)")
+ggsave("./outputs/automovel graph.png", dpi = 1000,
+       height = 12.5, width = 20, units = "cm")
+
+# Time series object
+auto <- ts(dataset_temp$producao_automoveis,
+           start=c(2000, 1), end=c(2022, 2), frequency=12)
+
+# Breakpoints test
+bp.nile <- breakpoints(auto ~ 1)
+summary(bp.nile)
+plot(bp.nile)
+confint(bp.nile, breaks = 5)
+
+# Non Linear Times series
+nonlinearityTest(auto)
+
+
+#Building lead and lag variables
+dataset <- dataset %>% 
+  mutate(abcr_lead1  = lead(fs_abcr_light,1),abcr_lead2  = lead(fs_abcr_light,2),abcr_lead3  = lead(fs_abcr_light,3),
+         juros_lag1 = lag(fs_interest_rate_exante,1),juros_lag2 = lag(fs_interest_rate_exante,2),juros_lag3 = lag(fs_interest_rate_exante,3),
+         pdiesel_lag1 = lag(fs_pdiesel,1),petanol_lag1 = lag(fs_petanol,1),pgasoline_lag1 = lag(fs_pgasoline,1),
+         pdiesel_lag2 = lag(fs_pdiesel,2),petanol_lag2 = lag(fs_petanol,2),pgasoline_lag2 = lag(fs_pgasoline,2),
+         pdiesel_lag3 = lag(fs_pdiesel,3),petanol_lag3 = lag(fs_petanol,3),pgasoline_lag3 = lag(fs_pgasoline,3)) %>% 
+  filter(data.table::between(as.numeric(substr(data_tidy,1,4)),2015,2023))
+
+# Bulding model -------
 # Login 
 faas4i::login()
 
-# Open data
-dataset_2 <- readxl::read_excel("./inputs/producao_auto-step2.xlsx") %>% 
-  rename(producao_automoveis = producaodeautomoveisnacionaloriginalmensalnivel) %>% 
-  select(-c(3:8,13:15,18)) %>% 
-  filter(as.numeric(substr(data_tidy,1,4))>=2000)
 
-dataset_3 <- dataset_2 %>% 
-  filter(as.numeric(substr(data_tidy,1,4))>=2010)
-
-dataset_1 <- dataset_2 %>% 
-  select(c(data_tidy,producao_automoveis))
-
-dataset_4 <- dataset_2 %>% 
-  mutate(pdiesel_lag1 = lag(fs_pdiesel,1),petanol_lag1 = lag(fs_petanol,1),pgasoline_lag1 = lag(fs_pgasoline,1),
-         pdiesel_lag2 = lag(fs_pdiesel,2),petanol_lag2 = lag(fs_petanol,2),pgasoline_lag2 = lag(fs_pgasoline,2),
-         pdiesel_lag3 = lag(fs_pdiesel,3),petanol_lag3 = lag(fs_petanol,3),pgasoline_lag3 = lag(fs_pgasoline,3))
-
-dataset_5 <- dataset_2 %>% 
-  mutate(pdiesel_lag1 = lag(fs_pdiesel,1),petanol_lag1 = lag(fs_petanol,1),pgasoline_lag1 = lag(fs_pgasoline,1),
-         pdiesel_lag2 = lag(fs_pdiesel,2),petanol_lag2 = lag(fs_petanol,2),pgasoline_lag2 = lag(fs_pgasoline,2),
-         pdiesel_lag3 = lag(fs_pdiesel,3),petanol_lag3 = lag(fs_petanol,3),pgasoline_lag3 = lag(fs_pgasoline,3)) %>% 
-  filter(as.numeric(substr(data_tidy,1,4))>=2010)
-
-
-# dataset_1 <- dataset_1 %>% filter(as.numeric(substr(data_tidy,1,4)) >= 2010)
-
-# Basic model -------
-
-data_list <-  list(dataset_1)
+data_list <-  list(dataset)
 names(data_list) <- c("producao_automoveis")
 
 # Default settings
@@ -328,16 +345,22 @@ date_variable <- 'data_tidy'
 date_format   <- '%Y-%m-%d'
 
 # Model Specification
-model_spec <- list(n_steps = 22,
-                   n_windows = 12,
-                   n_best = 20,
-                   exclusions = list(),
+model_spec <- list(n_steps = 12,
+                   n_windows = 10,
+                   exclusions = list(list("fs_interest_rate_exante","juros_lag1","juros_lag2","juros_lag3","fs_credit_new"),
+                                     list("abcr_lead1","abcr_lead2","abcr_lead3","fs_abcr_light"),
+                                     list("fs_pim","fs_gdp"),
+                                     list("fs_pdiesel","fs_petanol","fs_pgasoline",
+                                          "pdiesel_lag1","petanol_lag1","pgasoline_lag1",
+                                          "pdiesel_lag2","petanol_lag2","pgasoline_lag2",
+                                          "pdiesel_lag3","petanol_lag3","pgasoline_lag3")),
                    fill_forecast = TRUE,
+                   cv_summary = 'median',
                    log = TRUE,
                    seas.d = TRUE)
 
 # Project Name
-project_name <- "basic_model"
+project_name <- "main_model"
 
 
 # Verification of arguments
@@ -349,145 +372,10 @@ faas4i::validate_models(data_list    = data_list  , date_variable = date_variabl
 faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
                    date_format  = date_format, model_spec    = model_spec,
                    project_name = project_name)
-
-# Basic model -------
-
-data_list <-  list(dataset_2)
-names(data_list) <- c("producao_automoveis")
-
-# Default settings
-date_variable <- 'data_tidy'
-date_format   <- '%Y-%m-%d'
-
-# Model Specification
-model_spec <- list(n_steps = 22,
-                   n_windows = 12,
-                   n_best = 20,
-                   exclusions = list(),
-                   fill_forecast = TRUE,
-                   log = TRUE,
-                   seas.d = TRUE)
-
-# Project Name
-project_name <- "covariates_model"
-
-
-# Verification of arguments
-faas4i::validate_models(data_list    = data_list  , date_variable = date_variable,
-                        date_format  = date_format, model_spec    = model_spec,
-                        project_name = project_name)
-
-# Run model
-faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
-                   date_format  = date_format, model_spec    = model_spec,
-                   project_name = project_name)
-
-# Basic model -------
-
-data_list <-  list(dataset_3)
-names(data_list) <- c("producao_automoveis")
-
-# Default settings
-date_variable <- 'data_tidy'
-date_format   <- '%Y-%m-%d'
-
-# Model Specification
-model_spec <- list(n_steps = 22,
-                   n_windows = 12,
-                   n_best = 20,
-                   exclusions = list(),
-                   fill_forecast = TRUE,
-                   log = TRUE,
-                   seas.d = TRUE)
-
-# Project Name
-project_name <- "restricton_model"
-
-
-# Verification of arguments
-faas4i::validate_models(data_list    = data_list  , date_variable = date_variable,
-                        date_format  = date_format, model_spec    = model_spec,
-                        project_name = project_name)
-
-# Run model
-faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
-                   date_format  = date_format, model_spec    = model_spec,
-                   project_name = project_name)
-
-# Basic model -------
-
-data_list <-  list(dataset_4)
-names(data_list) <- c("producao_automoveis")
-
-# Default settings
-date_variable <- 'data_tidy'
-date_format   <- '%Y-%m-%d'
-
-# Model Specification
-model_spec <- list(n_steps = 22,
-                   n_windows = 12,
-                   n_best = 20,
-                   exclusions = list("fs_pdiesel","fs_petanol","fs_pgasoline",
-                                     "pdiesel_lag1","petanol_lag1","pgasoline_lag1",
-                                     "pdiesel_lag2","petanol_lag2","pgasoline_lag2",
-                                     "pdiesel_lag3","petanol_lag3","pgasoline_lag3"),
-                   fill_forecast = TRUE,
-                   log = TRUE,
-                   seas.d = TRUE)
-
-# Project Name
-project_name <- "with_lag_model"
-
-
-# Verification of arguments
-faas4i::validate_models(data_list    = data_list  , date_variable = date_variable,
-                        date_format  = date_format, model_spec    = model_spec,
-                        project_name = project_name)
-
-# Run model
-faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
-                   date_format  = date_format, model_spec    = model_spec,
-                   project_name = project_name)
-
-# Restrict and  lag model -------
-
-data_list <-  list(dataset_5)
-names(data_list) <- c("producao_automoveis")
-
-# Default settings
-date_variable <- 'data_tidy'
-date_format   <- '%Y-%m-%d'
-
-# Model Specification
-model_spec <- list(n_steps = 22,
-                   n_windows = 12,
-                   n_best = 20,
-                   exclusions = list("fs_pdiesel","fs_petanol","fs_pgasoline",
-                                     "pdiesel_lag1","petanol_lag1","pgasoline_lag1",
-                                     "pdiesel_lag2","petanol_lag2","pgasoline_lag2",
-                                     "pdiesel_lag3","petanol_lag3","pgasoline_lag3"),
-                   fill_forecast = TRUE,
-                   log = TRUE,
-                   seas.d = TRUE)
-
-# Project Name
-project_name <- "restrict_lag_model"
-
-
-# Verification of arguments
-faas4i::validate_models(data_list    = data_list  , date_variable = date_variable,
-                        date_format  = date_format, model_spec    = model_spec,
-                        project_name = project_name)
-
-# Run model
-faas4i::run_models(data_list    = data_list  , date_variable = date_variable,
-                   date_format  = date_format, model_spec    = model_spec,
-                   project_name = project_name)
-
 
 ## Unzip projcets -----------
 
-download_zip(project_id = list_projects()[[5]]$id,
+download_zip(project_id = list_projects()[[1]]$id,
              path = "D:/Pedro Jorge/4i",
              filename = "processo_seletivo_4i")
 unzip("forecast-processo_seletivo_4i.zip")
