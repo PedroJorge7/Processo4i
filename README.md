@@ -10,5 +10,3 @@ Base com outputs: outputs
 Código latex: files latex
 
 PDF principal: pedrojorge.pdf
-
-![logo.jpg](logo.jpg)
