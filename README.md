@@ -1,4 +1,4 @@
-# Processo 4i
+# Processo seletivo 4i
 ## Pedro Jorge Holanda Alves
 
 Script principal: script.R
