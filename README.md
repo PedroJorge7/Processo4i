@@ -9,4 +9,4 @@ Base com outputs: outputs
 
 Código latex: files latex
 
-PDF principal: pedrojorge.pdf
+PDF principal: resolucao_pedroalves_exercicio_4intelligence_ps.pdf
